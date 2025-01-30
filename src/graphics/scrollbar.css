@@ -1,0 +1,24 @@
+.scroll-pane {
+    -fx-padding: 0;
+}
+
+.scroll-pane .scroll-bar:vertical {
+    -fx-border-color: transparent transparent transparent #CCCCCC;
+    -fx-border-width: 0 0 0 1px; /* Bordure à gauche pour indiquer la scrollbar */
+    -fx-pref-width: 16px;
+}
+
+.scroll-pane .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .thumb {
+    -fx-background-color: #888888; /* Couleur de la scrollbar */
+    -fx-background-radius: 4px; /* Coins arrondis */
+}
+
+.scroll-pane .increment-button,
+.scroll-pane .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
