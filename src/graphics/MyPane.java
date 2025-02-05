@@ -2,8 +2,12 @@ package graphics;
 
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.control.Label;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 
 public class MyPane extends Pane {
 
@@ -20,11 +24,43 @@ public class MyPane extends Pane {
 		// Création de la grille de 15 x 15
 		for (int row = 0; row < NUM_ROWS; row++) {
 			for (int col = 0; col < NUM_COLS; col++) {
+				// Chaque case est un StackPane, afin de pouvoir y superposer une lettre (Label)
+				StackPane cellPane = new StackPane();
+				cellPane.setPrefSize(CELL_SIZE, CELL_SIZE);
+
 				Rectangle cell = new Rectangle(CELL_SIZE, CELL_SIZE);
 				cell.setStroke(Color.BLACK);
-				// Appliquer la couleur de fond en fonction de la position (row, col)
 				cell.setFill(getCellColor(row, col));
-				grid.add(cell, col, row);
+
+				cellPane.getChildren().add(cell);
+
+				// Gestionnaire d'événements pour accepter le drag over
+				cellPane.setOnDragOver(event -> {
+					Dragboard db = event.getDragboard();
+					if (event.getGestureSource() != cellPane && db.hasString()) {
+						event.acceptTransferModes(TransferMode.MOVE);
+					}
+					event.consume();
+				});
+
+				// Gestionnaire d'événement pour le drop d'une tuile lettre
+				cellPane.setOnDragDropped(event -> {
+					Dragboard db = event.getDragboard();
+					boolean success = false;
+					if (db.hasString()) {
+						String letter = db.getString();
+						// Création d'un Label pour afficher la lettre déposée
+						Label letterLabel = new Label(letter);
+						letterLabel.setStyle("-fx-font-size: 24; -fx-font-weight: bold;");
+						// On ajoute le label sur le cellPane (au-dessus du Rectangle)
+						cellPane.getChildren().add(letterLabel);
+						success = true;
+					}
+					event.setDropCompleted(success);
+					event.consume();
+				});
+
+				grid.add(cellPane, col, row);
 			}
 		}
 		this.getChildren().add(grid);
