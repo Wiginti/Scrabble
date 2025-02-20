@@ -1,0 +1,45 @@
+/* Styles du bouton Annuler */
+.annuler-btn {
+    -fx-background-color: #FF5555; /* Rouge clair */
+    -fx-text-fill: white;          /* Texte en blanc */
+    -fx-font-size: 18px;           /* Taille de police */
+    -fx-font-weight: bold;         /* Texte en gras */
+    -fx-border-radius: 10px;       /* Bords arrondis */
+    -fx-background-radius: 10px;   /* Fond arrondi */
+    -fx-padding: 5px 10px;         /* Padding interne */
+    -fx-pref-width: 120px;         /* Largeur */
+    -fx-pref-height: 40px;         /* Hauteur */
+}
+
+/* Effet au survol */
+.annuler-btn:hover {
+    -fx-background-color: #DD4444; /* Rouge plus foncé au survol */
+}
+
+/* Effet lors du clic */
+.annuler-btn:pressed {
+    -fx-background-color: #BB3333; /* Rouge encore plus foncé au clic */
+}
+
+/* Styles du bouton Valider */
+.valider-btn {
+    -fx-background-color: #55AA55; /* Vert clair */
+    -fx-text-fill: white;          /* Texte en blanc */
+    -fx-font-size: 18px;           /* Taille de police */
+    -fx-font-weight: bold;         /* Texte en gras */
+    -fx-border-radius: 10px;       /* Bords arrondis */
+    -fx-background-radius: 10px;   /* Fond arrondi */
+    -fx-padding: 5px 10px;         /* Padding interne */
+    -fx-pref-width: 120px;         /* Largeur */
+    -fx-pref-height: 40px;         /* Hauteur */
+}
+
+/* Effet au survol */
+.valider-btn:hover {
+    -fx-background-color: #449944; /* Vert plus foncé au survol */
+}
+
+/* Effet lors du clic */
+.valider-btn:pressed {
+    -fx-background-color: #337733; /* Vert encore plus foncé au clic */
+}
