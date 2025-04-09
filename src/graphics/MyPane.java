@@ -343,59 +343,141 @@ public class MyPane extends Pane {
     }
 
     /**
-     * Calcule le score du coup en tenant compte des valeurs des lettres,
-     * des multiplicateurs des cases sur lesquelles les lettres nouvellement posées sont placées,
-     * et complète le chevalet du joueur.
-     *
-     * Seuls les multiplicateurs des cases des lettres posées ce tour-ci (placedLettersMap) sont pris en compte.
+     * Vérifie les règles de placement, valide tous les mots formés (mot principal et mots croisés)
+     * et calcule le score total en appliquant les bonus uniquement sur les lettres nouvellement posées.
      */
     private void validateBoard() {
-        String word = getPlacedWord();
-        if (word == null || word.length() < 2) {
-            showError("Mot invalide : il doit contenir au moins 2 lettres.");
+        // S'il n'y a aucune lettre posée, on désactive le bouton de validation.
+        if (placedLettersMap.isEmpty()) {
+            validateButton.setDisable(true);
             return;
         }
-        if (!dictionary.validWord(word)) {
-            showError("Le mot '" + word + "' n'est pas dans le dictionnaire !");
-            return;
-        }
-        showSuccess("Bravo ! Le mot '" + word + "' est valide et a été ajouté au plateau.");
-        validatedWords.add(word);
 
-        // Calcul du score
-        // La base correspond à la somme des valeurs de toutes les lettres du mot (sans bonus)
-        int baseScore = 0;
-        for (int i = 0; i < word.length(); i++) {
-            char letter = word.charAt(i);
-            Integer value = Letter.pointsLetter.get(Character.toUpperCase(letter));
-            if (value != null) {
-                baseScore += value;
+        List<String> formedWords = new ArrayList<>();
+        List<Integer> wordsScores = new ArrayList<>();
+
+        // Si plus d'une lettre a été posée, le mot principal est clairement aligné horizontalement ou verticalement.
+        if (placedLettersMap.size() > 1) {
+            Set<Integer> rows = new HashSet<>();
+            Set<Integer> cols = new HashSet<>();
+            for (Label label : placedLettersMap.keySet()) {
+                StackPane parent = (StackPane) label.getParent();
+                Integer r = GridPane.getRowIndex(parent);
+                Integer c = GridPane.getColumnIndex(parent);
+                if (r != null) rows.add(r);
+                if (c != null) cols.add(c);
             }
-        }
-        // Pour les lettres nouvellement posées, on ajoute un bonus
-        int bonus = 0;
-        int wordMultiplier = 1;
-        for (Label letterLabel : placedLettersMap.keySet()) {
-            String letterStr = letterLabel.getText();
-            if (letterStr != null && !letterStr.isEmpty()) {
-                char letter = letterStr.charAt(0);
-                Integer value = Letter.pointsLetter.get(Character.toUpperCase(letter));
-                StackPane parent = (StackPane) letterLabel.getParent();
-                Integer row = GridPane.getRowIndex(parent);
-                Integer col = GridPane.getColumnIndex(parent);
-                if (row != null && col != null && value != null) {
-                    int letterMult = getLetterMultiplier(row, col);
-                    bonus += value * (letterMult - 1);
-                    wordMultiplier *= getWordMultiplier(row, col);
+            // Si toutes les lettres sont sur la même ligne : mot principal horizontal.
+            if (rows.size() == 1) {
+                int fixedRow = rows.iterator().next();
+                int minCol = Integer.MAX_VALUE;
+                for (Label label : placedLettersMap.keySet()) {
+                    StackPane parent = (StackPane) label.getParent();
+                    int col = GridPane.getColumnIndex(parent);
+                    minCol = Math.min(minCol, col);
+                }
+                // On étend la recherche horizontalement pour obtenir le mot complet.
+                int[] horizRange = getHorizontalRange(fixedRow, minCol);
+                String mainWord = getWordString(true, fixedRow, horizRange[0], horizRange[1]);
+                formedWords.add(mainWord);
+                int scoreMain = computeWordScore(true, fixedRow, horizRange[0], horizRange[1]);
+                wordsScores.add(scoreMain);
+                // Pour chaque lettre posée, on vérifie s'il existe un mot vertical (mots croisés).
+                for (Label label : placedLettersMap.keySet()) {
+                    StackPane parent = (StackPane) label.getParent();
+                    int tileRow = GridPane.getRowIndex(parent);
+                    int tileCol = GridPane.getColumnIndex(parent);
+                    int[] vertRange = getVerticalRange(tileRow, tileCol);
+                    // Si le mot vertical a une longueur supérieure à 1, on le considère.
+                    if (vertRange[1] - vertRange[0] >= 1) {
+                        String crossWord = getWordString(false, tileCol, vertRange[0], vertRange[1]);
+                        if (crossWord.length() > 1) {
+                            formedWords.add(crossWord);
+                            int scoreCross = computeWordScore(false, tileCol, vertRange[0], vertRange[1]);
+                            wordsScores.add(scoreCross);
+                        }
+                    }
+                }
+            }
+            // Sinon, si toutes les lettres sont dans la même colonne : mot principal vertical.
+            else if (cols.size() == 1) {
+                int fixedCol = cols.iterator().next();
+                int minRow = Integer.MAX_VALUE;
+                for (Label label : placedLettersMap.keySet()) {
+                    StackPane parent = (StackPane) label.getParent();
+                    int row = GridPane.getRowIndex(parent);
+                    minRow = Math.min(minRow, row);
+                }
+                int[] vertRange = getVerticalRange(minRow, fixedCol);
+                String mainWord = getWordString(false, fixedCol, vertRange[0], vertRange[1]);
+                formedWords.add(mainWord);
+                int scoreMain = computeWordScore(false, fixedCol, vertRange[0], vertRange[1]);
+                wordsScores.add(scoreMain);
+                // Pour chaque lettre posée, on vérifie s'il existe un mot horizontal (mots croisés).
+                for (Label label : placedLettersMap.keySet()) {
+                    StackPane parent = (StackPane) label.getParent();
+                    int tileRow = GridPane.getRowIndex(parent);
+                    int tileCol = GridPane.getColumnIndex(parent);
+                    int[] horizRange = getHorizontalRange(tileRow, tileCol);
+                    if (horizRange[1] - horizRange[0] >= 1) {
+                        String crossWord = getWordString(true, tileRow, horizRange[0], horizRange[1]);
+                        if (crossWord.length() > 1) {
+                            formedWords.add(crossWord);
+                            int scoreCross = computeWordScore(true, tileRow, horizRange[0], horizRange[1]);
+                            wordsScores.add(scoreCross);
+                        }
+                    }
                 }
             }
         }
-        int gainedPoints = (baseScore + bonus) * wordMultiplier;
+        // Cas d'une seule lettre posée : on vérifie les deux directions.
+        else {
+            Label singleLabel = placedLettersMap.keySet().iterator().next();
+            StackPane parent = (StackPane) singleLabel.getParent();
+            int row = GridPane.getRowIndex(parent);
+            int col = GridPane.getColumnIndex(parent);
 
-        scoreManagers.get(currentPlayerIndex).addPoints(gainedPoints);
+            int[] horizRange = getHorizontalRange(row, col);
+            String horizWord = getWordString(true, row, horizRange[0], horizRange[1]);
+            if (horizWord.length() > 1) {
+                formedWords.add(horizWord);
+                int scoreHoriz = computeWordScore(true, row, horizRange[0], horizRange[1]);
+                wordsScores.add(scoreHoriz);
+            }
+            int[] vertRange = getVerticalRange(row, col);
+            String vertWord = getWordString(false, col, vertRange[0], vertRange[1]);
+            if (vertWord.length() > 1) {
+                formedWords.add(vertWord);
+                int scoreVert = computeWordScore(false, col, vertRange[0], vertRange[1]);
+                wordsScores.add(scoreVert);
+            }
+        }
+
+        // Vérifier avec le dictionnaire que tous les mots formés sont valides.
+        for (String word : formedWords) {
+            if (!dictionary.validWord(word)) {
+                showError("Le mot '" + word + "' n'est pas dans le dictionnaire !");
+                return;
+            }
+        }
+
+        // Calcul du score total en additionnant les scores des mots formés.
+        int totalPoints = 0;
+        for (int pts : wordsScores) {
+            totalPoints += pts;
+        }
+        scoreManagers.get(currentPlayerIndex).addPoints(totalPoints);
         scorePanes.get(currentPlayerIndex).refreshScore();
 
-        // Les lettres posées deviennent définitivement validées
+        // Message de succès affichant les mots validés et le score total gagné.
+        StringBuilder msg = new StringBuilder("Bravo !\nLes mots validés :\n");
+        for (int i = 0; i < formedWords.size(); i++) {
+            msg.append(formedWords.get(i)).append(" (").append(wordsScores.get(i)).append(" points)\n");
+        }
+        msg.append("Total : ").append(totalPoints).append(" points.");
+        showSuccess(msg.toString());
+
+        // Finalisation : on désactive le drag sur les lettres posées et on les marque comme validées.
         for (Label letterLabel : placedLettersMap.keySet()) {
             letterLabel.setOnDragDetected(null);
             validatedLetters.add(letterLabel);
@@ -404,66 +486,115 @@ public class MyPane extends Pane {
         firstWordPlaced = true;
         validateButton.setDisable(true);
 
-        // Reconstituer le chevalet du joueur
+        // Reconstitution du chevalet pour le joueur courant.
         refillRack(playerRacks.get(currentPlayerIndex));
     }
 
     /**
-     * Construit le mot à partir des lettres posées en étendant la recherche
-     * aux cases adjacentes contenant déjà des lettres validées.
+     * Retourne true si, à la position (row, col), il y a une lettre nouvellement posée.
      */
-    private String getPlacedWord() {
-        List<Integer> rows = new ArrayList<>();
-        List<Integer> cols = new ArrayList<>();
+    private boolean isNewTileAt(int row, int col) {
         for (Label label : placedLettersMap.keySet()) {
             StackPane parent = (StackPane) label.getParent();
-            Integer row = GridPane.getRowIndex(parent);
-            Integer col = GridPane.getColumnIndex(parent);
-            if (row != null && col != null) {
-                rows.add(row);
-                cols.add(col);
+            Integer r = GridPane.getRowIndex(parent);
+            Integer c = GridPane.getColumnIndex(parent);
+            if (r != null && c != null && r == row && c == col) {
+                return true;
             }
         }
-        boolean alignedHorizontally = (new HashSet<>(rows).size() == 1);
-        boolean alignedVertically   = (new HashSet<>(cols).size() == 1);
-        if (alignedHorizontally) {
-            int row = rows.get(0);
-            int minCol = Collections.min(cols);
-            int maxCol = Collections.max(cols);
-            int col = minCol;
-            while (col > 0 && getLetterAt(row, col - 1) != null) { col--; }
-            minCol = col;
-            col = maxCol;
-            while (col < NUM_COLS - 1 && getLetterAt(row, col + 1) != null) { col++; }
-            maxCol = col;
-            StringBuilder word = new StringBuilder();
-            for (int c = minCol; c <= maxCol; c++) {
-                String letter = getLetterAt(row, c);
-                if (letter != null) {
-                    word.append(letter);
-                }
-            }
-            return word.toString();
-        } else if (alignedVertically) {
-            int col = cols.get(0);
-            int minRow = Collections.min(rows);
-            int maxRow = Collections.max(rows);
-            int row = minRow;
-            while (row > 0 && getLetterAt(row - 1, col) != null) { row--; }
-            minRow = row;
-            row = maxRow;
-            while (row < NUM_ROWS - 1 && getLetterAt(row + 1, col) != null) { row++; }
-            maxRow = row;
-            StringBuilder word = new StringBuilder();
-            for (int r = minRow; r <= maxRow; r++) {
-                String letter = getLetterAt(r, col);
-                if (letter != null) {
-                    word.append(letter);
-                }
-            }
-            return word.toString();
+        return false;
+    }
+
+    /**
+     * Pour une recherche horizontale, renvoie le couple [colStart, colEnd] correspondant à l'étendue du mot
+     * présent sur la même ligne (row), en se basant sur les cellules contiguës occupées.
+     */
+    private int[] getHorizontalRange(int row, int col) {
+        int start = col;
+        while (start > 0 && getLetterAt(row, start - 1) != null) {
+            start--;
         }
-        return null;
+        int end = col;
+        while (end < NUM_COLS - 1 && getLetterAt(row, end + 1) != null) {
+            end++;
+        }
+        return new int[]{start, end};
+    }
+
+    /**
+     * Pour une recherche verticale, renvoie le couple [rowStart, rowEnd] correspondant à l'étendue du mot
+     * présent sur la même colonne (col), en se basant sur les cellules contiguës occupées.
+     */
+    private int[] getVerticalRange(int row, int col) {
+        int start = row;
+        while (start > 0 && getLetterAt(start - 1, col) != null) {
+            start--;
+        }
+        int end = row;
+        while (end < NUM_ROWS - 1 && getLetterAt(end + 1, col) != null) {
+            end++;
+        }
+        return new int[]{start, end};
+    }
+
+    /**
+     * Construit une chaîne de caractères représentant le mot formé le long d'une ligne ou d'une colonne.
+     * @param horizontal Si true, le mot est lu horizontalement (la ligne est fixe) ; sinon verticalement (la colonne est fixe).
+     * @param fixed La ligne (si horizontal) ou la colonne (si vertical).
+     * @param start La colonne (si horizontal) ou la ligne (si vertical) de départ.
+     * @param end La colonne (si horizontal) ou la ligne (si vertical) de fin.
+     */
+    private String getWordString(boolean horizontal, int fixed, int start, int end) {
+        StringBuilder word = new StringBuilder();
+        for (int pos = start; pos <= end; pos++) {
+            String letter;
+            if (horizontal) {
+                letter = getLetterAt(fixed, pos);
+            } else {
+                letter = getLetterAt(pos, fixed);
+            }
+            if (letter != null) {
+                word.append(letter);
+            }
+        }
+        return word.toString();
+    }
+
+    /**
+     * Calcule le score d'un mot situé sur une ligne ou une colonne.
+     * Seules les lettres nouvellement posées bénéficient des multiplicateurs (bonus) de la case.
+     * @param horizontal Si true, le mot est horizontal (la ligne est fixe) ; sinon vertical (la colonne est fixe).
+     * @param fixed La ligne (si horizontal) ou la colonne (si vertical) correspondante.
+     * @param start La colonne (si horizontal) ou la ligne (si vertical) de départ.
+     * @param end La colonne (si horizontal) ou la ligne (si vertical) de fin.
+     */
+    private int computeWordScore(boolean horizontal, int fixed, int start, int end) {
+        int score = 0;
+        int wordMultiplier = 1;
+        for (int pos = start; pos <= end; pos++) {
+            int row, col;
+            if (horizontal) {
+                row = fixed;
+                col = pos;
+            } else {
+                row = pos;
+                col = fixed;
+            }
+            String letterStr = getLetterAt(row, col);
+            if (letterStr == null || letterStr.isEmpty()) continue;
+            char letter = letterStr.charAt(0);
+            int letterValue = Letter.pointsLetter.get(Character.toUpperCase(letter));
+            int letterMult = 1;
+            int cellWordMult = 1;
+            // Si la lettre provient de la pose actuelle, on applique les bonus.
+            if (isNewTileAt(row, col)) {
+                letterMult = getLetterMultiplier(row, col);
+                cellWordMult = getWordMultiplier(row, col);
+            }
+            score += letterValue * letterMult;
+            wordMultiplier *= cellWordMult;
+        }
+        return score * wordMultiplier;
     }
 
     /**
