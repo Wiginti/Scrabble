@@ -3,6 +3,8 @@ package graphics;
 import game.Letter;
 import dictionary.Dictionary;
 import game.ScoreManager;
+import game.BoardState;
+import game.OptimizedMoveEngine;
 
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -47,6 +49,9 @@ public class MyPane extends Pane {
     private Button validateButton;
     private Button resetButton;
     private Button nextPlayerButton;
+
+    // Nouvelle variable pour le bouton optimisé (déclarée ici pour référence si nécessaire)
+    private Button optimizedButton;
 
     // Indique si c'est la première pose
     private boolean firstWordPlaced = false;
@@ -192,7 +197,40 @@ public class MyPane extends Pane {
         nextPlayerButton = new Button("Joueur suivant");
         nextPlayerButton.setOnAction(e -> switchToNextPlayer());
 
-        // Positionnement des composants
+        // Bouton "Optimisé" ajouté pour lancer l'algorithme d'optimisation
+        optimizedButton = new Button("Optimisé");
+        optimizedButton.setOnAction(e -> {
+            // Récupérer les lettres du chevalet du joueur courant
+            List<Character> rackLetters = getRackLettersForCurrentPlayer();
+
+            // Construire l'état du plateau
+            BoardState boardState = buildBoardState();
+
+            // Appeler l'algorithme d'optimisation
+            OptimizedMoveEngine.BestMove bestMove = OptimizedMoveEngine.findBestMove(rackLetters, boardState, dictionary);
+
+            if (bestMove != null) {
+                // Demander confirmation au joueur via une boîte de dialogue
+                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                alert.setTitle("Coup optimisé");
+                alert.setHeaderText("Mot proposé : " + bestMove.word);
+                alert.setContentText("Ce mot rapporte " + bestMove.score +
+                        " points.\nVoulez-vous le jouer ?");
+                Optional<ButtonType> result = alert.showAndWait();
+                if (result.isPresent() && result.get() == ButtonType.OK) {
+                    // Placer automatiquement le mot sur le plateau
+                    placeOptimizedMove(bestMove);
+                }
+            } else {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Aucune solution");
+                alert.setHeaderText(null);
+                alert.setContentText("Aucune solution optimisée n'a été trouvée.");
+                alert.showAndWait();
+            }
+        });
+
+        // Positionnement des composants sur l'interface
         grid.setLayoutX(0);
         grid.setLayoutY(0);
 
@@ -211,7 +249,11 @@ public class MyPane extends Pane {
         nextPlayerButton.setLayoutX(460);
         nextPlayerButton.setLayoutY(NUM_ROWS * CELL_SIZE + 120 + (numberOfPlayers - 1) * 60);
 
-        this.getChildren().addAll(grid, resetButton, validateButton, nextPlayerButton);
+        // Position du bouton Optimisé
+        optimizedButton.setLayoutX(600);
+        optimizedButton.setLayoutY(NUM_ROWS * CELL_SIZE + 120 + (numberOfPlayers - 1) * 60);
+
+        this.getChildren().addAll(grid, resetButton, validateButton, nextPlayerButton, optimizedButton);
 
         // Chargement du fichier CSS pour le style (si présent)
         try {
@@ -830,6 +872,91 @@ public class MyPane extends Pane {
         }
         return false;
     }
+
+    /////////////// MÉTHODES AJOUTÉES POUR LE MODE "OPTIMISÉ" ///////////////
+
+    /**
+     * Extrait les lettres du chevalet du joueur courant.
+     */
+    private List<Character> getRackLettersForCurrentPlayer() {
+        List<Character> letters = new ArrayList<>();
+        HBox currentRack = playerRacks.get(currentPlayerIndex);
+        for (Node node : currentRack.getChildren()) {
+            if (node instanceof StackPane) {
+                for (Node child : ((StackPane) node).getChildren()) {
+                    if (child instanceof Label) {
+                        String letter = ((Label) child).getText();
+                        if (letter != null && !letter.isEmpty()) {
+                            letters.add(letter.charAt(0));
+                        }
+                    }
+                }
+            }
+        }
+        return letters;
+    }
+
+    /**
+     * Construit un BoardState à partir de l'état actuel du plateau.
+     */
+    private BoardState buildBoardState() {
+        String[][] gridState = new String[NUM_ROWS][NUM_COLS];
+        for (Node node : grid.getChildren()) {
+            Integer row = GridPane.getRowIndex(node);
+            Integer col = GridPane.getColumnIndex(node);
+            if (row != null && col != null && node instanceof StackPane) {
+                for (Node child : ((StackPane) node).getChildren()) {
+                    if (child instanceof Label) {
+                        gridState[row][col] = ((Label) child).getText();
+                    }
+                }
+            }
+        }
+        return new BoardState(gridState);
+    }
+
+    /**
+     * Place automatiquement le coup optimisé sur le plateau.
+     *
+     * @param bestMove Le meilleur mouvement trouvé par l'algorithme d'optimisation.
+     */
+    private void placeOptimizedMove(OptimizedMoveEngine.BestMove bestMove) {
+        int row = bestMove.startRow;
+        int col = bestMove.startCol;
+        boolean horizontal = bestMove.horizontal;
+
+        // Pour chaque caractère du mot, placer la lettre dans la case correspondante
+        for (int i = 0; i < bestMove.word.length(); i++) {
+            char c = bestMove.word.charAt(i);
+            // Parcourir le grid pour trouver le StackPane correspondant à la case (row, col)
+            for (Node node : grid.getChildren()) {
+                Integer r = GridPane.getRowIndex(node);
+                Integer cCol = GridPane.getColumnIndex(node);
+                if (r != null && cCol != null && r == row && cCol == col && node instanceof StackPane) {
+                    Label letterLabel = createDraggableLetter(String.valueOf(c));
+                    ((StackPane) node).getChildren().add(letterLabel);
+                    // Marquer la lettre comme définitivement validée
+                    letterLabel.setOnDragDetected(null);
+                    validatedLetters.add(letterLabel);
+                    break;
+                }
+            }
+            if (horizontal) {
+                col++;
+            } else {
+                row++;
+            }
+        }
+        // Mettre à jour le score du joueur courant
+        scoreManagers.get(currentPlayerIndex).addPoints(bestMove.score);
+        scorePanes.get(currentPlayerIndex).refreshScore();
+
+        // Passer au joueur suivant
+        switchToNextPlayer();
+    }
+    ////////////// FIN DES MÉTHODES AJOUTÉES ///////////////
+
+
+    ////////////// FIN DES MÉTHODES EXISTANTES ///////////////
+
 }
-
-
