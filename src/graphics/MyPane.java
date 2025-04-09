@@ -30,7 +30,7 @@ public class MyPane extends Pane {
     private Dictionary dictionary;
     private int numberOfPlayers;
 
-    // Un rack par joueur
+    // Un chevalet par joueur
     private List<HBox> playerRacks = new ArrayList<>();
 
     // Un ScoreManager par joueur
@@ -50,7 +50,7 @@ public class MyPane extends Pane {
     private Button resetButton;
     private Button nextPlayerButton;
 
-    // Nouvelle variable pour le bouton optimisé (déclarée ici pour référence si nécessaire)
+    // Bouton "Optimisé"
     private Button optimizedButton;
 
     // Indique si c'est la première pose
@@ -62,6 +62,7 @@ public class MyPane extends Pane {
     private List<Label> validatedLetters = new ArrayList<>();
 
     // Mots validés enregistrés
+    @SuppressWarnings("unused")
     private List<String> validatedWords = new ArrayList<>();
 
     public MyPane(int numberOfPlayers, BasicScene mainApp) {
@@ -91,7 +92,7 @@ public class MyPane extends Pane {
                 cell.setFill(getCellColor(row, col));
                 cellPane.getChildren().add(cell);
 
-                // Gestion du drag & drop : on autorise le déplacement
+                // Gestion du drag & drop
                 cellPane.setOnDragOver(event -> {
                     if (event.getGestureSource() instanceof Label && event.getDragboard().hasString()) {
                         event.acceptTransferModes(TransferMode.MOVE);
@@ -99,19 +100,17 @@ public class MyPane extends Pane {
                     event.consume();
                 });
 
-                // Modification de l'événement de drop pour gérer le joker
+                // Gestion du drop avec gestion du joker
                 cellPane.setOnDragDropped(event -> {
                     Dragboard db = event.getDragboard();
                     if (db.hasString()) {
                         String letter = db.getString();
                         Label letterLabel = createDraggableLetter(letter);
 
-                        // Si le jeton est un joker (affiché par un astérisque), on demande à l'utilisateur de choisir la lettre
                         if ("*".equals(letter)) {
                             String chosen = promptForJokerLetter();
                             if (!"*".equals(chosen)) {
                                 letterLabel.setText(chosen);
-                                // Marquer le label comme provenant d'un joker
                                 letterLabel.setUserData("joker");
                             }
                         }
@@ -121,7 +120,6 @@ public class MyPane extends Pane {
                             return;
                         }
 
-                        // Ajouter la nouvelle lettre sur la case
                         cellPane.getChildren().add(letterLabel);
 
                         Label draggedLabel = (Label) event.getGestureSource();
@@ -130,18 +128,15 @@ public class MyPane extends Pane {
                             return;
                         }
 
-                        // Retirer l'ancienne lettre de son parent
                         StackPane previousTile = (StackPane) draggedLabel.getParent();
                         if (previousTile != null) {
                             previousTile.getChildren().remove(draggedLabel);
                         }
 
-                        // Mettre à jour la position d'origine des lettres posées ce tour-ci
                         StackPane originalTile = placedLettersMap.getOrDefault(draggedLabel, previousTile);
                         placedLettersMap.remove(draggedLabel);
                         placedLettersMap.put(letterLabel, originalTile);
 
-                        // Permettre à la lettre d'être redéplacée
                         letterLabel.setOnDragDetected(event2 -> {
                             Dragboard db2 = letterLabel.startDragAndDrop(TransferMode.MOVE);
                             ClipboardContent content = new ClipboardContent();
@@ -162,7 +157,7 @@ public class MyPane extends Pane {
             }
         }
 
-        // ScoreManagers et ScorePanes (un par joueur)
+        // Initialisation des ScoreManagers et ScorePanes
         for (int i = 0; i < numberOfPlayers; i++) {
             ScoreManager sm = new ScoreManager();
             scoreManagers.add(sm);
@@ -173,13 +168,13 @@ public class MyPane extends Pane {
         // Création d'un chevalet pour chaque joueur
         for (int i = 0; i < numberOfPlayers; i++) {
             HBox rack = new HBox(5);
-            rack.setVisible(false); // Seul le chevalet du joueur courant est visible
+            rack.setVisible(false);
             initializeChevalet(rack);
             playerRacks.add(rack);
             this.getChildren().add(rack);
         }
 
-        // Afficher le chevalet du joueur 0
+        // Affichage du chevalet du premier joueur
         playerRacks.get(0).setVisible(true);
 
         // Bouton "Annuler"
@@ -197,82 +192,72 @@ public class MyPane extends Pane {
         nextPlayerButton = new Button("Joueur suivant");
         nextPlayerButton.setOnAction(e -> switchToNextPlayer());
 
-        // Bouton "Optimisé" ajouté pour lancer l'algorithme d'optimisation
+        // Bouton "Optimisé" pour lancer l'algorithme d'optimisation
         optimizedButton = new Button("Optimisé");
         optimizedButton.setOnAction(e -> {
-            // Récupérer les lettres du chevalet du joueur courant
             List<Character> rackLetters = getRackLettersForCurrentPlayer();
-
-            // Construire l'état du plateau
             BoardState boardState = buildBoardState();
-
-            // Appeler l'algorithme d'optimisation
             OptimizedMoveEngine.BestMove bestMove = OptimizedMoveEngine.findBestMove(rackLetters, boardState, dictionary);
 
             if (bestMove != null) {
-                // Demander confirmation au joueur via une boîte de dialogue
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                 alert.setTitle("Coup optimisé");
                 alert.setHeaderText("Mot proposé : " + bestMove.word);
-                alert.setContentText("Ce mot rapporte " + bestMove.score +
-                        " points.\nVoulez-vous le jouer ?");
+                
+                StringBuilder alertContent = new StringBuilder();
+                alertContent.append("Ce coup rapporte un total de ")
+                            .append(bestMove.score)
+                            .append(" points.\n")
+                            .append("Dont :\n")
+                            .append("  - Mot principal : ")
+                            .append(bestMove.mainScore)
+                            .append(" points\n")
+                            .append("  - Mots croisés   : ")
+                            .append(bestMove.crossScore)
+                            .append(" points\n")
+                            .append("Voulez-vous le jouer ?");
+                            
+                alert.setContentText(alertContent.toString());
+                
                 Optional<ButtonType> result = alert.showAndWait();
                 if (result.isPresent() && result.get() == ButtonType.OK) {
-                    // Placer automatiquement le mot sur le plateau
                     placeOptimizedMove(bestMove);
                 }
-            } else {
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("Aucune solution");
-                alert.setHeaderText(null);
-                alert.setContentText("Aucune solution optimisée n'a été trouvée.");
-                alert.showAndWait();
             }
+
         });
 
-        // Positionnement des composants sur l'interface
+        // Positionnement des composants
         grid.setLayoutX(0);
         grid.setLayoutY(0);
-
         for (int i = 0; i < numberOfPlayers; i++) {
             HBox rack = playerRacks.get(i);
             rack.setLayoutX(155);
             rack.setLayoutY(NUM_ROWS * CELL_SIZE + 60 + (i * 60));
         }
-
         resetButton.setLayoutX(180);
         resetButton.setLayoutY(NUM_ROWS * CELL_SIZE + 120 + (numberOfPlayers - 1) * 60);
-
         validateButton.setLayoutX(320);
         validateButton.setLayoutY(NUM_ROWS * CELL_SIZE + 120 + (numberOfPlayers - 1) * 60);
-
         nextPlayerButton.setLayoutX(460);
         nextPlayerButton.setLayoutY(NUM_ROWS * CELL_SIZE + 120 + (numberOfPlayers - 1) * 60);
-
-        // Position du bouton Optimisé
         optimizedButton.setLayoutX(600);
         optimizedButton.setLayoutY(NUM_ROWS * CELL_SIZE + 120 + (numberOfPlayers - 1) * 60);
 
         this.getChildren().addAll(grid, resetButton, validateButton, nextPlayerButton, optimizedButton);
 
-        // Chargement du fichier CSS pour le style (si présent)
+        // Chargement du CSS si présent
         try {
             this.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
         } catch (Exception e) {
-            // style.css non trouvé
+            // style.css introuvable
         }
     }
 
-    /**
-     * Renvoie la liste de tous les ScorePane (un par joueur).
-     */
     public List<ScorePane> getAllScorePanes() {
         return scorePanes;
     }
 
-    /**
-     * Permet de passer au joueur suivant et met à jour l'interface.
-     */
     private void switchToNextPlayer() {
         validateButton.setDisable(true);
         playerRacks.get(currentPlayerIndex).setVisible(false);
@@ -283,9 +268,6 @@ public class MyPane extends Pane {
         }
     }
 
-    /**
-     * Vérifie les règles de placement et active/désactive le bouton de validation.
-     */
     private void checkPlacementRules() {
         if (placedLettersMap.isEmpty()) {
             validateButton.setDisable(true);
@@ -344,9 +326,6 @@ public class MyPane extends Pane {
         validateButton.setDisable(false);
     }
 
-    /**
-     * Vérifie qu'une ligne ou colonne est continue (toutes les cases entre min et max sont occupées).
-     */
     private boolean isLineContinuous(boolean horizontal, int fixed, int min, int max) {
         for (int i = min; i <= max; i++) {
             String letter = horizontal ? getLetterAt(fixed, i) : getLetterAt(i, fixed);
@@ -355,9 +334,6 @@ public class MyPane extends Pane {
         return true;
     }
 
-    /**
-     * Vérifie qu'au moins une des lettres posées est adjacente à une lettre déjà validée.
-     */
     private boolean isConnectedToValidated() {
         for (Label label : placedLettersMap.keySet()) {
             StackPane parent = (StackPane) label.getParent();
@@ -373,9 +349,6 @@ public class MyPane extends Pane {
         return false;
     }
 
-    /**
-     * Vérifie si une lettre validée est présente à la position (row, col).
-     */
     private boolean isValidatedLetterAt(int row, int col) {
         for (Label validatedLabel : validatedLetters) {
             Node parent = validatedLabel.getParent();
@@ -390,11 +363,6 @@ public class MyPane extends Pane {
         return false;
     }
 
-    /**
-     * Valide le coup en vérifiant l'ensemble des mots formés (mot principal et mots croisés),
-     * en tenant compte des multiplicateurs appliqués aux lettres nouvellement posées.
-     * Ce code intègre la gestion du joker.
-     */
     private void validateBoard() {
         List<String> formedWords = new ArrayList<>();
         List<Integer> wordsScores = new ArrayList<>();
@@ -404,96 +372,98 @@ public class MyPane extends Pane {
             return;
         }
 
-        if (placedLettersMap.size() > 1) {
-            Set<Integer> rows = new HashSet<>();
-            Set<Integer> cols = new HashSet<>();
+        // Déterminer l'orientation du placement
+        Set<Integer> rows = new HashSet<>();
+        Set<Integer> cols = new HashSet<>();
+        for (Label label : placedLettersMap.keySet()) {
+            StackPane parent = (StackPane) label.getParent();
+            Integer row = GridPane.getRowIndex(parent);
+            Integer col = GridPane.getColumnIndex(parent);
+            if (row != null) rows.add(row);
+            if (col != null) cols.add(col);
+        }
+        boolean horizontalPlacement = (rows.size() == 1);
+        boolean verticalPlacement = (cols.size() == 1);
+
+        // Calcul du mot principal et son score
+        String mainWord = "";
+        int mainScore = 0;
+        if (horizontalPlacement) {
+            int fixedRow = rows.iterator().next();
+            int minCol = Integer.MAX_VALUE;
             for (Label label : placedLettersMap.keySet()) {
                 StackPane parent = (StackPane) label.getParent();
-                Integer r = GridPane.getRowIndex(parent);
-                Integer c = GridPane.getColumnIndex(parent);
-                if (r != null) rows.add(r);
-                if (c != null) cols.add(c);
+                int col = GridPane.getColumnIndex(parent);
+                minCol = Math.min(minCol, col);
             }
-            if (rows.size() == 1) {
-                int fixedRow = rows.iterator().next();
-                int minCol = Integer.MAX_VALUE;
-                for (Label label : placedLettersMap.keySet()) {
-                    StackPane parent = (StackPane) label.getParent();
-                    int col = GridPane.getColumnIndex(parent);
-                    minCol = Math.min(minCol, col);
-                }
-                int[] horizRange = getHorizontalRange(fixedRow, minCol);
-                String mainWord = getWordString(true, fixedRow, horizRange[0], horizRange[1]);
-                formedWords.add(mainWord);
-                int scoreMain = computeWordScore(true, fixedRow, horizRange[0], horizRange[1]);
-                wordsScores.add(scoreMain);
-                // Vérifier les mots croisés verticaux pour chaque lettre posée
-                for (Label label : placedLettersMap.keySet()) {
-                    StackPane parent = (StackPane) label.getParent();
-                    int tileRow = GridPane.getRowIndex(parent);
-                    int tileCol = GridPane.getColumnIndex(parent);
-                    int[] vertRange = getVerticalRange(tileRow, tileCol);
-                    if (vertRange[1] - vertRange[0] >= 1) {
-                        String crossWord = getWordString(false, tileCol, vertRange[0], vertRange[1]);
-                        if (crossWord.length() > 1) {
-                            formedWords.add(crossWord);
-                            int scoreCross = computeWordScore(false, tileCol, vertRange[0], vertRange[1]);
-                            wordsScores.add(scoreCross);
-                        }
-                    }
-                }
-            } else if (cols.size() == 1) {
-                int fixedCol = cols.iterator().next();
-                int minRow = Integer.MAX_VALUE;
-                for (Label label : placedLettersMap.keySet()) {
-                    StackPane parent = (StackPane) label.getParent();
-                    int row = GridPane.getRowIndex(parent);
-                    minRow = Math.min(minRow, row);
-                }
-                int[] vertRange = getVerticalRange(minRow, fixedCol);
-                String mainWord = getWordString(false, fixedCol, vertRange[0], vertRange[1]);
-                formedWords.add(mainWord);
-                int scoreMain = computeWordScore(false, fixedCol, vertRange[0], vertRange[1]);
-                wordsScores.add(scoreMain);
-                // Vérifier les mots croisés horizontaux pour chaque lettre posée
-                for (Label label : placedLettersMap.keySet()) {
-                    StackPane parent = (StackPane) label.getParent();
-                    int tileRow = GridPane.getRowIndex(parent);
-                    int tileCol = GridPane.getColumnIndex(parent);
-                    int[] horizRange = getHorizontalRange(tileRow, tileCol);
-                    if (horizRange[1] - horizRange[0] >= 1) {
-                        String crossWord = getWordString(true, tileRow, horizRange[0], horizRange[1]);
-                        if (crossWord.length() > 1) {
-                            formedWords.add(crossWord);
-                            int scoreCross = computeWordScore(true, tileRow, horizRange[0], horizRange[1]);
-                            wordsScores.add(scoreCross);
-                        }
-                    }
-                }
+            int[] horizRange = getHorizontalRange(fixedRow, minCol);
+            mainWord = getWordString(true, fixedRow, horizRange[0], horizRange[1]);
+            mainScore = computeWordScore(true, fixedRow, horizRange[0], horizRange[1]);
+        } else if (verticalPlacement) {
+            int fixedCol = cols.iterator().next();
+            int minRow = Integer.MAX_VALUE;
+            for (Label label : placedLettersMap.keySet()) {
+                StackPane parent = (StackPane) label.getParent();
+                int row = GridPane.getRowIndex(parent);
+                minRow = Math.min(minRow, row);
             }
-        } else { // Cas d'une seule lettre posée : vérifier dans les deux directions
-            Label singleLabel = placedLettersMap.keySet().iterator().next();
-            StackPane parent = (StackPane) singleLabel.getParent();
-            int row = GridPane.getRowIndex(parent);
-            int col = GridPane.getColumnIndex(parent);
+            int[] vertRange = getVerticalRange(minRow, fixedCol);
+            mainWord = getWordString(false, fixedCol, vertRange[0], vertRange[1]);
+            mainScore = computeWordScore(false, fixedCol, vertRange[0], vertRange[1]);
+        } else {
+            // Cas d'un unique jeton ou placement irrégulier :
+            StackPane parent = (StackPane) placedLettersMap.keySet().iterator().next().getParent();
+            int r = GridPane.getRowIndex(parent);
+            int c = GridPane.getColumnIndex(parent);
+            int[] horizRange = getHorizontalRange(r, c);
+            String horizWord = getWordString(true, r, horizRange[0], horizRange[1]);
+            int horizScore = (horizWord.length() > 1) ? computeWordScore(true, r, horizRange[0], horizRange[1]) : 0;
+            int[] vertRange = getVerticalRange(r, c);
+            String vertWord = getWordString(false, c, vertRange[0], vertRange[1]);
+            int vertScore = (vertWord.length() > 1) ? computeWordScore(false, c, vertRange[0], vertRange[1]) : 0;
+            // Ici, on additionne les scores obtenus dans les deux directions
+            mainWord = horizWord.length() >= vertWord.length() ? horizWord : vertWord;
+            mainScore = horizScore + vertScore;
+        }
+        formedWords.add(mainWord);
+        wordsScores.add(mainScore);
 
-            int[] horizRange = getHorizontalRange(row, col);
-            String horizWord = getWordString(true, row, horizRange[0], horizRange[1]);
-            if (horizWord.length() > 1) {
-                formedWords.add(horizWord);
-                int scoreHoriz = computeWordScore(true, row, horizRange[0], horizRange[1]);
-                wordsScores.add(scoreHoriz);
-            }
-            int[] vertRange = getVerticalRange(row, col);
-            String vertWord = getWordString(false, col, vertRange[0], vertRange[1]);
-            if (vertWord.length() > 1) {
-                formedWords.add(vertWord);
-                int scoreVert = computeWordScore(false, col, vertRange[0], vertRange[1]);
-                wordsScores.add(scoreVert);
+        // Calcul des mots croisés. Selon l'orientation du placement, pour chaque nouvelle lettre on
+        // va chercher le mot croisé dans la direction perpendiculaire.
+        Set<String> crossWordsComputed = new HashSet<>();
+        int crossTotalScore = 0;
+        for (Label label : placedLettersMap.keySet()) {
+            StackPane parent = (StackPane) label.getParent();
+            int r = GridPane.getRowIndex(parent);
+            int c = GridPane.getColumnIndex(parent);
+            if (horizontalPlacement) { // vérification verticale
+                int[] vertRange = getVerticalRange(r, c);
+                String crossWord = getWordString(false, c, vertRange[0], vertRange[1]);
+                if (crossWord.length() > 1 && !crossWordsComputed.contains(crossWord)) {
+                    int crossScore = computeWordScore(false, c, vertRange[0], vertRange[1]);
+                    formedWords.add(crossWord);
+                    wordsScores.add(crossScore);
+                    crossWordsComputed.add(crossWord);
+                    crossTotalScore += crossScore;
+                }
+            } else if (verticalPlacement) { // vérification horizontale
+                int[] horizRange = getHorizontalRange(r, c);
+                String crossWord = getWordString(true, r, horizRange[0], horizRange[1]);
+                if (crossWord.length() > 1 && !crossWordsComputed.contains(crossWord)) {
+                    int crossScore = computeWordScore(true, r, horizRange[0], horizRange[1]);
+                    formedWords.add(crossWord);
+                    wordsScores.add(crossScore);
+                    crossWordsComputed.add(crossWord);
+                    crossTotalScore += crossScore;
+                }
+            } else {
+                // Pour un seul jeton, on a déjà traité les deux directions.
             }
         }
 
-        // Vérifier que tous les mots formés sont valides (selon le dictionnaire)
+        int totalPoints = mainScore + crossTotalScore;
+
+        // Vérification de la validité de tous les mots formés
         for (String word : formedWords) {
             if (!dictionary.validWord(word)) {
                 showError("Le mot '" + word + "' n'est pas dans le dictionnaire !");
@@ -501,23 +471,20 @@ public class MyPane extends Pane {
             }
         }
 
-        // Calcul du score total pour le coup
-        int totalPoints = 0;
-        for (int pts : wordsScores) {
-            totalPoints += pts;
-        }
+        // Mise à jour du score et affichage du message
         scoreManagers.get(currentPlayerIndex).addPoints(totalPoints);
         scorePanes.get(currentPlayerIndex).refreshScore();
 
-        // Afficher une notification des mots validés et du score obtenu
         StringBuilder msg = new StringBuilder("Bravo !\nLes mots validés :\n");
         for (int i = 0; i < formedWords.size(); i++) {
-            msg.append(formedWords.get(i)).append(" (").append(wordsScores.get(i)).append(" points)\n");
+            msg.append(formedWords.get(i))
+               .append(" (")
+               .append(wordsScores.get(i))
+               .append(" points)\n");
         }
         msg.append("Total : ").append(totalPoints).append(" points.");
         showSuccess(msg.toString());
 
-        // Marquer les lettres posées comme définitivement validées
         for (Label letterLabel : placedLettersMap.keySet()) {
             letterLabel.setOnDragDetected(null);
             validatedLetters.add(letterLabel);
@@ -525,14 +492,10 @@ public class MyPane extends Pane {
         placedLettersMap.clear();
         firstWordPlaced = true;
         validateButton.setDisable(true);
-
-        // Reconstituer le chevalet pour le joueur courant
         refillRack(playerRacks.get(currentPlayerIndex));
     }
 
-    /**
-     * Retourne la lettre présente dans la cellule (row, col) du plateau.
-     */
+
     private String getLetterAt(int row, int col) {
         for (Node node : grid.getChildren()) {
             Integer r = GridPane.getRowIndex(node);
@@ -550,9 +513,6 @@ public class MyPane extends Pane {
         return null;
     }
 
-    /**
-     * Annule le placement du coup en cours et remet les lettres sur le chevalet d'origine.
-     */
     private void resetBoard() {
         List<Label> lettersToRemove = new ArrayList<>(placedLettersMap.keySet());
         for (Label letterLabel : lettersToRemove) {
@@ -571,9 +531,6 @@ public class MyPane extends Pane {
         validateButton.setDisable(true);
     }
 
-    /**
-     * Initialise un chevalet (7 lettres piochées) pour un joueur.
-     */
     private void initializeChevalet(HBox rack) {
         rack.getChildren().clear();
         for (int i = 0; i < 7; i++) {
@@ -592,9 +549,6 @@ public class MyPane extends Pane {
         }
     }
 
-    /**
-     * Reconstitue le chevalet en piochant dans le sac pour remplir les cases vides.
-     */
     private void refillRack(HBox rack) {
         for (Node node : rack.getChildren()) {
             if (node instanceof StackPane) {
@@ -617,10 +571,7 @@ public class MyPane extends Pane {
         }
     }
 
-    /**
-     * Retourne le multiplicateur de lettre pour la case (row, col).
-     */
-    private int getLetterMultiplier(int row, int col) {
+    public static int getLetterMultiplier(int row, int col) {
         Color color = getCellColor(row, col);
         if (color.equals(Color.DARKBLUE)) {
             return 3;
@@ -630,10 +581,7 @@ public class MyPane extends Pane {
         return 1;
     }
 
-    /**
-     * Retourne le multiplicateur de mot pour la case (row, col).
-     */
-    private int getWordMultiplier(int row, int col) {
+    public static int getWordMultiplier(int row, int col) {
         Color color = getCellColor(row, col);
         if (color.equals(Color.RED)) {
             return 3;
@@ -643,9 +591,6 @@ public class MyPane extends Pane {
         return 1;
     }
 
-    /**
-     * Crée un label draggable pour une lettre donnée.
-     */
     private Label createDraggableLetter(String letter) {
         Label letterLabel = new Label(letter);
         letterLabel.setStyle("-fx-font-size: 24; -fx-font-weight: bold;");
@@ -659,9 +604,6 @@ public class MyPane extends Pane {
         return letterLabel;
     }
 
-    /**
-     * Affiche une fenêtre d'erreur.
-     */
     private void showError(String message) {
         Alert alert = new Alert(AlertType.ERROR);
         alert.setTitle("Erreur de validation");
@@ -670,21 +612,15 @@ public class MyPane extends Pane {
         alert.showAndWait();
     }
 
-    /**
-     * Affiche une fenêtre d'information.
-     */
     private void showSuccess(String message) {
-        Alert alert = new Alert(AlertType.INFORMATION);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Mot validé !");
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
     }
 
-    /**
-     * Retourne la couleur d'arrière-plan de la case (row, col) du plateau.
-     */
-    private Color getCellColor(int row, int col) {
+    private static Color getCellColor(int row, int col) {
         if ((row == 0 && (col == 0 || col == 7 || col == 14)) ||
                 (row == 7 && (col == 0 || col == 14)) ||
                 (row == 14 && (col == 0 || col == 7 || col == 14))) {
@@ -721,9 +657,6 @@ public class MyPane extends Pane {
         return Color.BEIGE;
     }
 
-    /**
-     * Ouvre une fenêtre de saisie pour demander au joueur la lettre qu'il souhaite attribuer au joker.
-     */
     private String promptForJokerLetter() {
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("Choix du Joker");
@@ -731,16 +664,11 @@ public class MyPane extends Pane {
         dialog.setContentText("Entrez la lettre que vous souhaitez attribuer au joker :");
         Optional<String> result = dialog.showAndWait();
         if (result.isPresent() && !result.get().isEmpty()) {
-            // On récupère le premier caractère et on le met en majuscule
             return result.get().substring(0, 1).toUpperCase();
         }
-        // Si l'utilisateur annule ou ne saisit rien, on conserve l'astérisque
         return "*";
     }
 
-    /**
-     * Vérifie si la case (row, col) contient une lettre issue d'un joker.
-     */
     private boolean isJokerTileAt(int row, int col) {
         for (Node node : grid.getChildren()) {
             Integer r = GridPane.getRowIndex(node);
@@ -761,9 +689,6 @@ public class MyPane extends Pane {
         return false;
     }
 
-    /**
-     * Pour une recherche horizontale, renvoie [colStart, colEnd] de l'étendue du mot sur la ligne.
-     */
     private int[] getHorizontalRange(int row, int col) {
         int start = col;
         while (start > 0 && getLetterAt(row, start - 1) != null) {
@@ -776,9 +701,6 @@ public class MyPane extends Pane {
         return new int[]{start, end};
     }
 
-    /**
-     * Pour une recherche verticale, renvoie [rowStart, rowEnd] de l'étendue du mot sur la colonne.
-     */
     private int[] getVerticalRange(int row, int col) {
         int start = row;
         while (start > 0 && getLetterAt(start - 1, col) != null) {
@@ -791,24 +713,10 @@ public class MyPane extends Pane {
         return new int[]{start, end};
     }
 
-    /**
-     * Construit une chaîne représentant le mot le long d'une ligne (ou colonne).
-     *
-     * @param horizontal Si vrai, le mot est horizontal (ligne fixe), sinon vertical (colonne fixe).
-     * @param fixed      La ligne (ou colonne) fixe.
-     * @param start      Le début (colonne ou ligne).
-     * @param end        La fin (colonne ou ligne).
-     * @return Le mot formé.
-     */
     private String getWordString(boolean horizontal, int fixed, int start, int end) {
         StringBuilder word = new StringBuilder();
         for (int pos = start; pos <= end; pos++) {
-            String letter;
-            if (horizontal) {
-                letter = getLetterAt(fixed, pos);
-            } else {
-                letter = getLetterAt(pos, fixed);
-            }
+            String letter = horizontal ? getLetterAt(fixed, pos) : getLetterAt(pos, fixed);
             if (letter != null) {
                 word.append(letter);
             }
@@ -816,16 +724,6 @@ public class MyPane extends Pane {
         return word.toString();
     }
 
-    /**
-     * Calcule le score d'un mot situé sur une ligne ou une colonne.
-     * Seules les lettres nouvellement posées bénéficient des bonus. Pour un joker, la valeur sera forcée à 0.
-     *
-     * @param horizontal Si vrai, le mot est horizontal ; sinon vertical.
-     * @param fixed      La ligne (ou colonne) fixe.
-     * @param start      Début (colonne ou ligne).
-     * @param end        Fin (colonne ou ligne).
-     * @return Le score calculé pour le mot.
-     */
     private int computeWordScore(boolean horizontal, int fixed, int start, int end) {
         int score = 0;
         int wordMultiplier = 1;
@@ -842,7 +740,6 @@ public class MyPane extends Pane {
             if (letterStr == null || letterStr.isEmpty()) continue;
             char letter = letterStr.charAt(0);
             int letterValue = Letter.pointsLetter.get(Character.toUpperCase(letter));
-            // Si la lettre est une nouvelle pose et provient d'un joker, on fixe sa valeur à 0
             if (isNewTileAt(row, col) && isJokerTileAt(row, col)) {
                 letterValue = 0;
             }
@@ -858,9 +755,6 @@ public class MyPane extends Pane {
         return score * wordMultiplier;
     }
 
-    /**
-     * Vérifie si, à la position (row, col), la lettre a été posée ce tour-ci.
-     */
     private boolean isNewTileAt(int row, int col) {
         for (Label label : placedLettersMap.keySet()) {
             StackPane parent = (StackPane) label.getParent();
@@ -873,11 +767,6 @@ public class MyPane extends Pane {
         return false;
     }
 
-    /////////////// MÉTHODES AJOUTÉES POUR LE MODE "OPTIMISÉ" ///////////////
-
-    /**
-     * Extrait les lettres du chevalet du joueur courant.
-     */
     private List<Character> getRackLettersForCurrentPlayer() {
         List<Character> letters = new ArrayList<>();
         HBox currentRack = playerRacks.get(currentPlayerIndex);
@@ -896,9 +785,6 @@ public class MyPane extends Pane {
         return letters;
     }
 
-    /**
-     * Construit un BoardState à partir de l'état actuel du plateau.
-     */
     private BoardState buildBoardState() {
         String[][] gridState = new String[NUM_ROWS][NUM_COLS];
         for (Node node : grid.getChildren()) {
@@ -915,48 +801,108 @@ public class MyPane extends Pane {
         return new BoardState(gridState);
     }
 
-    /**
-     * Place automatiquement le coup optimisé sur le plateau.
-     *
-     * @param bestMove Le meilleur mouvement trouvé par l'algorithme d'optimisation.
-     */
+    // Méthode de placement d'un coup optimisé
     private void placeOptimizedMove(OptimizedMoveEngine.BestMove bestMove) {
+        // Capture l'état du plateau AVANT le placement
+        BoardState boardStateBefore = buildBoardState();
         int row = bestMove.startRow;
         int col = bestMove.startCol;
         boolean horizontal = bestMove.horizontal;
 
-        // Pour chaque caractère du mot, placer la lettre dans la case correspondante
+        // Placement automatique sur le plateau
         for (int i = 0; i < bestMove.word.length(); i++) {
-            char c = bestMove.word.charAt(i);
-            // Parcourir le grid pour trouver le StackPane correspondant à la case (row, col)
+        	char c = Character.toUpperCase(bestMove.word.charAt(i));
+            // Si la case était déjà remplie dans boardStateBefore, on passe à la cellule suivante
+            if (boardStateBefore.safeHasLetter(row, col)) {
+                if (horizontal)
+                    col++;
+                else
+                    row++;
+                continue;
+            }
+            // Ajout de la lettre sur le plateau
             for (Node node : grid.getChildren()) {
                 Integer r = GridPane.getRowIndex(node);
                 Integer cCol = GridPane.getColumnIndex(node);
                 if (r != null && cCol != null && r == row && cCol == col && node instanceof StackPane) {
                     Label letterLabel = createDraggableLetter(String.valueOf(c));
                     ((StackPane) node).getChildren().add(letterLabel);
-                    // Marquer la lettre comme définitivement validée
                     letterLabel.setOnDragDetected(null);
                     validatedLetters.add(letterLabel);
                     break;
                 }
             }
-            if (horizontal) {
+            if (horizontal)
                 col++;
-            } else {
+            else
                 row++;
-            }
         }
-        // Mettre à jour le score du joueur courant
+
+        // Utilise l'état du plateau AVANT le placement pour retirer les lettres du chevalet
+        removeOptimizedMoveLettersFromRack(bestMove, boardStateBefore);
+        refillRack(playerRacks.get(currentPlayerIndex));
+
+        // Mise à jour du score et passage au joueur suivant
         scoreManagers.get(currentPlayerIndex).addPoints(bestMove.score);
         scorePanes.get(currentPlayerIndex).refreshScore();
-
-        // Passer au joueur suivant
+        refillRack(playerRacks.get(currentPlayerIndex));
         switchToNextPlayer();
     }
-    ////////////// FIN DES MÉTHODES AJOUTÉES ///////////////
 
+    // Retire les lettres utilisées pour le coup optimisé en se basant sur l'état du plateau AVANT placement
+    private void removeOptimizedMoveLettersFromRack(OptimizedMoveEngine.BestMove move, BoardState boardStateBefore) {
+        HBox rack = playerRacks.get(currentPlayerIndex);
 
-    ////////////// FIN DES MÉTHODES EXISTANTES ///////////////
+        List<Label> rackLetters = new ArrayList<>();
+        // Récupère toutes les étiquettes présentes dans chaque StackPane du chevalet.
+        for (Node node : rack.getChildren()) {
+            if (node instanceof StackPane) {
+                for (Node child : ((StackPane) node).getChildren()) {
+                    if (child instanceof Label) {
+                        rackLetters.add((Label) child);
+                    }
+                }
+            }
+        }
+
+        int row = move.startRow;
+        int col = move.startCol;
+
+        // Pour chaque lettre du mot optimisé, si la case était vide avant placement,
+        // cela signifie qu'elle a été jouée à partir du chevalet.
+        for (int i = 0; i < move.word.length(); i++) {
+            char letter = Character.toUpperCase(move.word.charAt(i));
+
+            if (!boardStateBefore.safeHasLetter(row, col)) {
+                boolean removed = false;
+                // Cherche la lettre correspondante dans le chevalet.
+                for (Label rackLabel : rackLetters) {
+                    if (rackLabel.getText().equalsIgnoreCase(String.valueOf(letter))) {
+                        // On vérifie que le label a bien un parent avant de le retirer.
+                        if (rackLabel.getParent() != null && rackLabel.getParent() instanceof StackPane) {
+                            ((StackPane) rackLabel.getParent()).getChildren().remove(rackLabel);
+                            removed = true;
+                            break;
+                        }
+                    }
+                }
+                // Si la lettre n'a pas été trouvée, on tente de retirer un joker.
+                if (!removed) {
+                    for (Label rackLabel : rackLetters) {
+                        if (rackLabel.getText().equals("*")) {
+                            if (rackLabel.getParent() != null && rackLabel.getParent() instanceof StackPane) {
+                                ((StackPane) rackLabel.getParent()).getChildren().remove(rackLabel);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if (move.horizontal)
+                col++;
+            else
+                row++;
+        }
+    }
 
 }

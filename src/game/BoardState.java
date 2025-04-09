@@ -11,6 +11,11 @@ public class BoardState {
         }
     }
 
+    public boolean safeHasLetter(int row, int col) {
+        return row >= 0 && row < getRows() && col >= 0 && col < getCols() && hasLetter(row, col);
+    }
+
+    
     public String getLetterAt(int row, int col) {
         return grid[row][col];
     }
