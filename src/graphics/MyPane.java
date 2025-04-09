@@ -592,7 +592,8 @@ public class MyPane extends Pane {
     }
 
     private Label createDraggableLetter(String letter) {
-        Label letterLabel = new Label(letter);
+        // Forcer l'affichage de la lettre en majuscule
+        Label letterLabel = new Label(letter.toUpperCase());
         letterLabel.setStyle("-fx-font-size: 24; -fx-font-weight: bold;");
         letterLabel.setOnDragDetected(event -> {
             Dragboard db = letterLabel.startDragAndDrop(TransferMode.MOVE);
@@ -801,7 +802,16 @@ public class MyPane extends Pane {
         return new BoardState(gridState);
     }
 
+<<<<<<< HEAD
     // Méthode de placement d'un coup optimisé
+=======
+
+    /**
+     * Place automatiquement le coup optimisé sur le plateau.
+     *
+     * @param bestMove Le meilleur mouvement trouvé par l'algorithme d'optimisation.
+     */
+>>>>>>> 442b3cfef8a8039bc2f15842e6c6e440d5434a5b
     private void placeOptimizedMove(OptimizedMoveEngine.BestMove bestMove) {
         // Capture l'état du plateau AVANT le placement
         BoardState boardStateBefore = buildBoardState();
