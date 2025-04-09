@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Dictionary {
     private HashSet<String> words;
@@ -30,4 +32,8 @@ public class Dictionary {
         return words.contains(word.toLowerCase());
     }
 
+    // Méthode ajoutée pour récupérer tous les mots du dictionnaire
+    public List<String> getWords() {
+        return new ArrayList<>(words);
+    }
 }
