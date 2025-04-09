@@ -55,6 +55,6 @@ public class BoardState {
 
     // Permet de poser/modifier la lettre sur une case donnée
     public void setLetter(int row, int col, char letter) {
-        grid[row][col] = String.valueOf(letter);
+        grid[row][col] = String.valueOf(Character.toUpperCase(letter));
     }
 }

@@ -647,7 +647,8 @@ public class MyPane extends Pane {
      * Crée un label draggable pour une lettre donnée.
      */
     private Label createDraggableLetter(String letter) {
-        Label letterLabel = new Label(letter);
+        // Forcer l'affichage de la lettre en majuscule
+        Label letterLabel = new Label(letter.toUpperCase());
         letterLabel.setStyle("-fx-font-size: 24; -fx-font-weight: bold;");
         letterLabel.setOnDragDetected(event -> {
             Dragboard db = letterLabel.startDragAndDrop(TransferMode.MOVE);
@@ -914,6 +915,7 @@ public class MyPane extends Pane {
         }
         return new BoardState(gridState);
     }
+
 
     /**
      * Place automatiquement le coup optimisé sur le plateau.
